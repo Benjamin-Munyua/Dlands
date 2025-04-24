@@ -138,6 +138,12 @@ async function updateUI() {
         roleManagement.style.display = isConnected ? 'block' : 'none';
     }
     
+    // Show register land form when connected
+    const registerLandForm = document.getElementById('registerLandForm');
+    if (registerLandForm) {
+        registerLandForm.style.display = isConnected ? 'block' : 'none';
+    }
+    
     if (isConnected) {
         try {
             // Get user's role
@@ -203,8 +209,29 @@ async function updateRoleSpecificUI() {
 
 // Load initial data
 async function loadInitialData() {
-    await loadLandsOnSale();
-    await loadAllLands();
+    try {
+        // Initialize Web3 with a provider that can read from the blockchain
+        if (typeof window.ethereum !== 'undefined') {
+            web3 = new Web3(window.ethereum);
+        } else {
+            // Fallback to a public RPC if MetaMask is not available
+            web3 = new Web3(new Web3.providers.HttpProvider('https://rpc-amoy.polygon.technology'));
+        }
+
+        // Load contract info
+        const response = await fetch('contract-info.json');
+        const contractInfo = await response.json();
+        contract = new web3.eth.Contract(contractInfo.abi, contractInfo.address);
+
+        // Load both tables
+        await loadAllLands();
+        await loadLandsOnSale();
+    } catch (error) {
+        console.error('Error loading initial data:', error);
+        // Still show empty tables even if there's an error
+        loadAllLands();
+        loadLandsOnSale();
+    }
 }
 
 // Initialize tables
@@ -795,11 +822,11 @@ function showError(message) {
     }, 5000);
 }
 
-// Initialize tables and event listeners when document is ready
+// Initialize when document is ready
 document.addEventListener('DOMContentLoaded', function() {
     // Initialize tables
     initTables();
-
+    
     // Initialize Web3 and contract
     initWeb3().then(() => {
         if (web3) {
@@ -808,61 +835,14 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 
     // Add event listeners
-    const landRegistrationForm = document.getElementById('landRegistrationForm');
-    const registerLandBtn = document.getElementById('registerLandBtn');
-    const viewLandsBtn = document.getElementById('viewLandsBtn');
-    const connectFromModal = document.getElementById('connectFromModal');
-    const locationFilter = document.getElementById('locationFilter');
-    const plotSearch = document.getElementById('plotSearch');
-
-    if (landRegistrationForm) {
-        landRegistrationForm.addEventListener('submit', handleLandRegistration);
-    }
-
-    if (registerLandBtn) {
-        registerLandBtn.addEventListener('click', () => {
-            if (accounts.length === 0) {
-                authRequiredModal.show();
-                return;
-            }
-            registerLandForm.classList.remove('d-none');
-            viewLandsSection.classList.add('d-none');
-        });
-    }
-
-    if (viewLandsBtn) {
-        viewLandsBtn.addEventListener('click', () => {
-            registerLandForm.classList.add('d-none');
-            viewLandsSection.classList.remove('d-none');
-        });
-    }
-
-    if (connectFromModal) {
-        connectFromModal.addEventListener('click', () => {
-            authRequiredModal.hide();
-            initWeb3();
-        });
-    }
-
-    if (locationFilter) {
-        locationFilter.addEventListener('change', async function() {
-            const location = this.value;
-            await loadLandsOnSale(location);
-        });
-    }
-
-    if (plotSearch) {
-        plotSearch.addEventListener('input', async function() {
-            const plotNumber = this.value;
-            if (plotNumber.length >= 3) {
-                await searchByPlotNumber(plotNumber);
-            }
-        });
-    }
-
+    document.getElementById('governmentTransferForm').addEventListener('submit', handleGovernmentTransfer);
+    
     // Add event listeners for table actions
     document.getElementById('allLandsTable').addEventListener('click', handleTableAction);
     document.getElementById('landsOnSaleTable').addEventListener('click', handleTableAction);
+
+    // Load initial data immediately
+    loadInitialData();
 });
 
 // Search by plot number
@@ -1427,26 +1407,6 @@ async function handleGovernmentTransfer(e) {
         }
     }
 }
-
-// Initialize when document is ready
-document.addEventListener('DOMContentLoaded', function() {
-    // Initialize tables
-    initTables();
-    
-    // Initialize Web3 and contract
-    initWeb3().then(() => {
-        if (web3) {
-            initContract();
-        }
-    });
-
-    // Add event listeners
-    document.getElementById('governmentTransferForm').addEventListener('submit', handleGovernmentTransfer);
-    
-    // Add event listeners for table actions
-    document.getElementById('allLandsTable').addEventListener('click', handleTableAction);
-    document.getElementById('landsOnSaleTable').addEventListener('click', handleTableAction);
-});
 
 // Function to show land transaction history
 async function showLandTransactionHistory(landId) {
